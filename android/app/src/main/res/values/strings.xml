@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Kizuna</string>
+    <string name="title_activity_main">Kizuna</string>
+    <string name="package_name">app.kizuna.chat</string>
+    <string name="custom_url_scheme">app.kizuna.chat</string>
+</resources>

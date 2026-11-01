@@ -1,0 +1,20 @@
+# Render Blueprint — deploys Kizuna from GitHub. https://render.com/docs/blueprint-spec
+# In Render: New → Blueprint → pick this repo. You'll be asked for DATABASE_URL (your Neon string).
+services:
+  - type: web
+    name: kizuna
+    runtime: node
+    plan: free # free sleeps after 15 min idle (~1 min to wake). Use "starter" for always-on.
+    region: singapore # keep it next to your Neon region (AWS ap-southeast-1 / Singapore)
+    branch: main
+    autoDeploy: true # every push to main redeploys
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: DATABASE_URL # Neon → Connection string (pooled), e.g. postgresql://…-pooler…/neondb?sslmode=require
+        sync: false
+      - key: KIZUNA_INVITE_CODE # optional: only people with this code can sign up
+        sync: false

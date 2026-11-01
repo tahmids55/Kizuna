@@ -1,0 +1,17 @@
+node_modules
+dist
+data/
+release/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+# Android build output (the native project itself is committed)
+android/app/build
+android/build
+android/.gradle
+android/local.properties
+android/app/src/main/assets/public
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json

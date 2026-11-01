@@ -1,0 +1,23 @@
+{
+  "appId": "app.kizuna.chat",
+  "appName": "Kizuna",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#0b1111",
+    "adjustMarginsForEdgeToEdge": "auto"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_kizuna",
+      "iconColor": "#0d9488"
+    },
+    "StatusBar": {
+      "overlaysWebView": false
+    }
+  }
+}
