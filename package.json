@@ -12,6 +12,7 @@
     "dev:api": "node --watch-path=server server/index.js",
     "dev:web": "vite --host",
     "build": "tsc --noEmit && vite build",
+    "postinstall": "npm run build",
     "start": "node server/index.js",
     "seed": "node server/seed.js",
     "seed:reset": "node server/seed.js --reset",
