@@ -1,8 +1,8 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, CheckCircle2, Server } from 'lucide-react';
-import { api, defaultServer, isNative, serverUrl, setServerUrl, setToken } from '../lib/api';
+import { ArrowRight, CheckCircle2 } from 'lucide-react';
+import { api, isNative, serverUrl, setToken } from '../lib/api';
 import { queryClient } from '../lib/store';
 import type { User } from '../lib/types';
 import { Field, Logo, Spinner } from '../components/ui';
@@ -20,24 +20,6 @@ function useMeta(server: string) {
     retry: false,
     staleTime: 60_000,
   });
-}
-
-/** On Android the user points the app at their team's server. */
-function ServerField({ onChange }: { onChange: (url: string) => void }) {
-  const [value, setValue] = useState(() => serverUrl() || defaultServer());
-  // Apply the address baked into the app straight away so the connection check runs.
-  const [checked, setChecked] = useState(() => serverUrl() || (isNative && defaultServer() ? setServerUrl(defaultServer()) : ''));
-  useEffect(() => onChange(checked), [checked, onChange]);
-  if (!isNative) return null;
-  const apply = () => setChecked(setServerUrl(value));
-  return (
-    <Field label="Server address" hint="The address shown when your team’s Kizuna server starts, e.g. http://192.168.0.10:4000">
-      <div className="server-field">
-        <Server size={16} className="muted" />
-        <input className="input" inputMode="url" autoCapitalize="off" autoCorrect="off" placeholder="http://192.168.0.10:4000" value={value} onChange={(e) => setValue(e.target.value)} onBlur={apply} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), apply())} />
-      </div>
-    </Field>
-  );
 }
 
 function Shell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
@@ -91,7 +73,6 @@ function useAuth(path: string) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const submit = async (body: Record<string, string>) => {
-    if (isNative && !serverUrl()) return setError('Enter your server address first');
     setBusy(true);
     setError('');
     try {
@@ -112,8 +93,7 @@ function useAuth(path: string) {
 export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [server, setServer] = useState(serverUrl());
-  const { data: meta, error: metaError } = useMeta(server);
+  const { data: meta } = useMeta(serverUrl());
   const { submit, error, busy } = useAuth('/auth/login');
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -122,8 +102,6 @@ export function LoginPage() {
   return (
     <Shell title="Welcome back" subtitle="Sign in to your team’s workspace.">
       <form className="auth-form" onSubmit={onSubmit}>
-        <ServerField onChange={setServer} />
-        {isNative && server && metaError && <div className="form-error">Can’t reach {server}. Is the server running and on the same network?</div>}
         <Field label="Email">
           <input className="input" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>
@@ -149,8 +127,7 @@ export function LoginPage() {
 
 export function RegisterPage() {
   const [form, setForm] = useState({ name: '', title: '', email: '', password: '', invite_code: '' });
-  const [server, setServer] = useState(serverUrl());
-  const { data: meta } = useMeta(server);
+  const { data: meta } = useMeta(serverUrl());
   const { submit, error, busy } = useAuth('/auth/register');
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
   return (
@@ -162,7 +139,6 @@ export function RegisterPage() {
           submit(form);
         }}
       >
-        <ServerField onChange={setServer} />
         <div className="form-row">
           <Field label="Full name">
             <input className="input" autoComplete="name" required maxLength={80} value={form.name} onChange={set('name')} />

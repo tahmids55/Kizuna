@@ -6,9 +6,18 @@ export const isNative = Capacitor.isNativePlatform();
 const SERVER_KEY = 'kizuna-server';
 const TOKEN_KEY = 'kizuna-token';
 
-/** On the web the API is same-origin. In the Android app the user chooses a server address. */
-export const serverUrl = () => (isNative ? localStorage.getItem(SERVER_KEY) ?? '' : '');
-export const defaultServer = () => localStorage.getItem(SERVER_KEY) ?? (import.meta.env.VITE_DEFAULT_SERVER as string | undefined) ?? '';
+const FALLBACK_SERVER = 'http://192.168.0.51:4000';
+
+export const defaultServer = () =>
+  localStorage.getItem(SERVER_KEY) ||
+  (import.meta.env.VITE_DEFAULT_SERVER as string | undefined) ||
+  FALLBACK_SERVER;
+
+/** On web the API is same-origin; on native it defaults to the configured backend without manual user input. */
+export const serverUrl = () => {
+  if (!isNative) return '';
+  return defaultServer();
+};
 
 export function setServerUrl(url: string) {
   let u = url.trim().replace(/\/+$/, '');

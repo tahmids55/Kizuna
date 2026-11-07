@@ -29,7 +29,10 @@ const lan = Object.entries(os.networkInterfaces())
 const server = process.env.KIZUNA_SERVER || (lan ? `http://${lan}:${process.env.PORT || 4000}` : '');
 console.log(`Default server baked into the app: ${server || '(none — users will type it in)'}`);
 
-const sdk = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT || path.join(os.homedir(), 'Android', 'Sdk');
+const sdk =
+  process.env.ANDROID_HOME ||
+  process.env.ANDROID_SDK_ROOT ||
+  (fs.existsSync('/media/tahmids55/162E93B12E9387FF/Android') ? '/media/tahmids55/162E93B12E9387FF/Android' : path.join(os.homedir(), 'Android', 'Sdk'));
 if (!fs.existsSync(sdk)) {
   console.error(`\n✗ Android SDK not found at ${sdk}. Install Android Studio (or the command-line tools) and set ANDROID_HOME.`);
   process.exit(1);

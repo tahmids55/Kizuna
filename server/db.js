@@ -42,7 +42,8 @@ async function createDriver() {
     url.searchParams.delete('sslmode');
     url.searchParams.delete('channel_binding');
     const local = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(url.hostname);
-    const ssl = sslmode === 'disable' || (local && !sslmode) ? false : { rejectUnauthorized: true };
+    const rejectUnauthorized = sslmode === 'verify-full' || process.env.DB_SSL_STRICT === 'true';
+    const ssl = sslmode === 'disable' || (local && !sslmode) ? false : { rejectUnauthorized };
     const pool = new pg.Pool({
       connectionString: url.toString(),
       ssl,
