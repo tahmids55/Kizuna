@@ -370,6 +370,7 @@ export function initDb() {
     await driver.transaction(async (c) => {
       await c.query('SELECT pg_advisory_xact_lock(7461001)');
       for (const stmt of SCHEMA.split(';').map((s) => s.trim()).filter(Boolean)) await c.query(stmt);
+      for (const table of TABLES) await c.query(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`).catch(() => {});
       // Auto-populate accepted requests for existing direct conversation pairs
       await c.query(`
         INSERT INTO message_requests (sender_id, recipient_id, status, created_at, updated_at)
