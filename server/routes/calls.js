@@ -16,9 +16,9 @@ callsRouter.post('/conversations/:id/call/token', async (req, res) => {
     }
   }
 
-  const apiKey = process.env.LIVEKIT_API_KEY;
-  const apiSecret = process.env.LIVEKIT_API_SECRET;
-  const serverUrl = process.env.LIVEKIT_URL;
+  const apiKey = process.env.LIVEKIT_API_KEY || 'APIb8kyteDtNzqN';
+  const apiSecret = process.env.LIVEKIT_API_SECRET || 'GxfkBpULbdneOrc0Ul5ylk5HjFFxqYIhkMxFZh4b1DR';
+  const serverUrl = process.env.LIVEKIT_URL || 'wss://kizuna-97za2zzi.livekit.cloud';
 
   if (!apiKey || !apiSecret || !serverUrl) {
     throw badRequest('Calling service is not configured on this server.');
