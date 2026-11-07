@@ -6,7 +6,7 @@ export const isNative = Capacitor.isNativePlatform();
 const SERVER_KEY = 'kizuna-server';
 const TOKEN_KEY = 'kizuna-token';
 
-const FALLBACK_SERVER = 'http://192.168.0.51:4000';
+const FALLBACK_SERVER = 'https://kizuna-rb1z.onrender.com';
 
 export const defaultServer = () =>
   localStorage.getItem(SERVER_KEY) ||
