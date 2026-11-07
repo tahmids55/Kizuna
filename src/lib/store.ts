@@ -1,7 +1,7 @@
 import { QueryClient, useQuery } from '@tanstack/react-query';
 import { useSyncExternalStore } from 'react';
 import { ApiError, api } from './api';
-import type { Conversation, Decision, Goal, Hub, Idea, ItemType, Message, Poll, Reminder, Task, Today, User } from './types';
+import type { Conversation, Decision, Goal, Hub, Idea, ItemType, Message, MessageRequest, Poll, Reminder, Task, Today, User } from './types';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -57,6 +57,11 @@ export const useMe = () =>
     queryFn: () => api<{ user: User }>('/auth/me').then((r) => r.user),
     staleTime: Infinity,
     retry: false,
+  });
+export const useRequests = () =>
+  useQuery({
+    queryKey: ['requests'],
+    queryFn: () => api<{ incoming: MessageRequest[]; outgoing: MessageRequest[] }>('/requests'),
   });
 export const useUsers = () => useQuery({ queryKey: ['users'], queryFn: () => api<{ users: User[] }>('/users').then((r) => r.users) });
 export const useConversations = () =>

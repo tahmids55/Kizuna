@@ -17,7 +17,7 @@ import {
 } from './store';
 import { conversationTitle } from './format';
 import { toast } from '../components/Toast';
-import type { Conversation, ItemType, Message, User } from './types';
+import type { Conversation, ItemType, Message, MessageRequest, User } from './types';
 
 let socket: Socket | null = null;
 
@@ -88,6 +88,16 @@ export function connectRealtime(me: User) {
   s.on('item', ({ type, item }: { type: ItemType; item: Parameters<typeof applyItem>[1] }) => applyItem(type, item));
   s.on('item:remove', ({ type, id, conversation_id }: { type: ItemType; id: number; conversation_id: number }) => removeItem(type, conversation_id, id));
   s.on('user:update', ({ user }: { user: User }) => applyUser(user));
+
+  s.on('request:new', ({ request }: { request: MessageRequest }) => {
+    queryClient.invalidateQueries({ queryKey: ['requests'] });
+    toast(`New message request from ${request.sender?.name || 'a teammate'}`);
+  });
+  s.on('request:updated', () => {
+    queryClient.invalidateQueries({ queryKey: ['requests'] });
+    queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    queryClient.invalidateQueries({ queryKey: ['users'] });
+  });
 }
 
 export function disconnectRealtime() {

@@ -11,6 +11,18 @@ export interface User {
   online?: boolean;
 }
 
+export interface MessageRequest {
+  id: number;
+  sender_id: number;
+  recipient_id: number;
+  status: 'pending' | 'accepted' | 'rejected';
+  note: string;
+  created_at: string;
+  updated_at: string;
+  sender: User | null;
+  recipient: User | null;
+}
+
 export interface Member extends User {
   role: 'owner' | 'admin' | 'member';
   last_read_id: number;

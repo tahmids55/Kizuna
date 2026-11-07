@@ -5,6 +5,7 @@ import { all, get, insert, run, tx } from '../db.js';
 import { badRequest, field, forbidden, notFound, now } from '../util.js';
 import {
   broadcastMessage,
+  canMessageDirectly,
   getMessage,
   memberIds,
   postMessage,
@@ -74,6 +75,12 @@ async function readReply(body, cid) {
 
 messagesRouter.post('/conversations/:id/messages', async (req, res) => {
   const { conversation } = await requireConversation(req, req.params.id);
+  if (conversation.type === 'direct') {
+    const otherMemberId = (await memberIds(conversation.id)).find((uid) => uid !== req.user.id);
+    if (otherMemberId && !(await canMessageDirectly(req.user.id, otherMemberId))) {
+      throw forbidden('Message cannot be sent because the message request has not been accepted.');
+    }
+  }
   const body = field.text(req.body, 'body', { label: 'Message', max: 8000, multiline: true }) ?? '';
   const attachmentIds = field.idList(req.body, 'attachment_ids', { label: 'Attachments', max: 10 }) ?? [];
   if (!body && !attachmentIds.length) throw badRequest('Write a message or attach a file');

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Crown, LogOut, Mail, Search, Shield, UserMinus, UserPlus } from 'lucide-react';
+import { Crown, LogOut, Mail, Search, Send, Shield, UserMinus, UserPlus } from 'lucide-react';
 import { api } from '../lib/api';
 import { conversationTitle, cx, lastSeen, otherMember, plural } from '../lib/format';
 import { queryClient, upsertConversation, useOnline, usePresence, useUsers } from '../lib/store';
@@ -364,7 +364,7 @@ export function NewChat({ open, onClose, me }: { open: boolean; onClose: () => v
       <div className="form">
         <Segmented value={mode} onChange={setMode} options={[{ value: 'direct', label: 'Direct message' }, { value: 'group', label: 'New group' }]} className="wide" />
         {mode === 'direct' ? (
-          <DirectPicker meId={me.id} onPick={startDirect} />
+          <DirectPicker meId={me.id} onPick={startDirect} onClose={onClose} />
         ) : (
           <>
             <GroupIdentity name={name} setName={setName} emoji={emoji} setEmoji={setEmoji} color={color} setColor={setColor} />
@@ -376,28 +376,175 @@ export function NewChat({ open, onClose, me }: { open: boolean; onClose: () => v
   );
 }
 
-function DirectPicker({ meId, onPick }: { meId: number; onPick: (id: number) => void }) {
+function DirectPicker({ meId, onPick, onClose }: { meId: number; onPick: (id: number) => void; onClose: () => void }) {
   const { data: users } = useUsers();
-  const [q, setQ] = useState('');
-  const list = (users ?? []).filter((u) => u.id !== meId && `${u.name} ${u.email} ${u.title}`.toLowerCase().includes(q.toLowerCase()));
+  const [email, setEmail] = useState('');
+  const [note, setNote] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{
+    user: User | null;
+    status: 'none' | 'pending_outgoing' | 'pending_incoming' | 'accepted' | 'rejected_by_them' | 'rejected_by_you' | 'self' | 'not_found';
+    request?: { id: number } | null;
+  } | null>(null);
+
+  const lookup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const target = email.trim().toLowerCase();
+    if (!target) return;
+    setSearching(true);
+    setResult(null);
+    try {
+      const res = await api<{
+        user: User | null;
+        status: 'none' | 'pending_outgoing' | 'pending_incoming' | 'accepted' | 'rejected_by_them' | 'rejected_by_you' | 'self' | 'not_found';
+        request?: { id: number } | null;
+      }>(`/requests/lookup?email=${encodeURIComponent(target)}`);
+      setResult(res);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const sendRequest = async () => {
+    if (!email.trim()) return;
+    setSending(true);
+    try {
+      const res = await api<{ request: { id: number; recipient_id: number; sender_id: number }; status: string; conversation?: Conversation }>('/requests', {
+        method: 'POST',
+        body: { email: email.trim(), note },
+      });
+      queryClient.invalidateQueries({ queryKey: ['requests'] });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      if (res.conversation) {
+        toast('Connected! Direct chat opened.');
+        onPick(res.request.recipient_id === meId ? res.request.sender_id : res.request.recipient_id);
+      } else {
+        toast('Message request sent! They will see it in their requests.');
+        setResult({ user: result?.user ?? null, status: 'pending_outgoing', request: res.request });
+      }
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const acceptIncoming = async (rid: number) => {
+    setSending(true);
+    try {
+      const res = await api<{ conversation: Conversation }>(`/requests/${rid}/accept`, { method: 'POST' });
+      queryClient.invalidateQueries({ queryKey: ['requests'] });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      upsertConversation(res.conversation);
+      toast('Request accepted!');
+      onClose();
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
-    <div className="people-select">
-      <div className="search-box">
-        <Search size={16} />
-        <input autoFocus placeholder="Search people" value={q} onChange={(e) => setQ(e.target.value)} />
-      </div>
-      <div className="people-list">
-        {list.map((u) => (
-          <button key={u.id} className="person-row" onClick={() => onPick(u.id)}>
-            <Avatar user={u} size={38} presence />
-            <span className="grow">
-              <strong>{u.name}</strong>
-              <span className="muted small">{u.status_text ? `${u.status_emoji} ${u.status_text}` : u.title || u.email}</span>
-            </span>
+    <div className="direct-picker">
+      <form onSubmit={lookup} className="email-lookup-form">
+        <label className="field-label">Find person by complete email address</label>
+        <div className="search-input-group">
+          <input
+            type="email"
+            className="input"
+            autoFocus
+            placeholder="e.g. colleague@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <button type="submit" className="btn btn-primary btn-sm" disabled={!email.trim() || searching}>
+            {searching ? <Spinner size={14} /> : <Search size={14} />} Find
           </button>
-        ))}
-        {!list.length && <p className="muted small center">{users && users.length <= 1 ? 'You’re the first one here. Ask your co-founders to create an account on this server.' : 'No matches'}</p>}
-      </div>
+        </div>
+      </form>
+
+      {result && (
+        <div className="lookup-result">
+          {result.status === 'not_found' || !result.user ? (
+            <div className="alert-box muted small">
+              No user found with that exact email address. Please make sure the email is spelled correctly.
+            </div>
+          ) : result.status === 'self' ? (
+            <div className="alert-box muted small">
+              That’s your own email address. Use “My space” for notes to yourself.
+            </div>
+          ) : (
+            <div className="lookup-user-card">
+              <div className="lookup-user-info">
+                <Avatar user={result.user} size={42} />
+                <div className="grow">
+                  <strong>{result.user.name}</strong>
+                  <div className="small muted">{result.user.email}</div>
+                  {result.user.title && <div className="small muted">{result.user.title}</div>}
+                </div>
+              </div>
+
+              {result.status === 'accepted' ? (
+                <div className="lookup-action-row">
+                  <span className="small text-success">Already connected</span>
+                  <button className="btn btn-primary btn-sm" onClick={() => onPick(result.user!.id)}>
+                    Open Chat
+                  </button>
+                </div>
+              ) : result.status === 'pending_incoming' && result.request ? (
+                <div className="lookup-action-row">
+                  <span className="small text-primary">They sent you a message request!</span>
+                  <button className="btn btn-primary btn-sm" onClick={() => acceptIncoming(result.request!.id)} disabled={sending}>
+                    {sending ? <Spinner size={14} /> : 'Accept Request'}
+                  </button>
+                </div>
+              ) : result.status === 'pending_outgoing' ? (
+                <div className="alert-box muted small">
+                  Message request pending. Waiting for them to accept.
+                </div>
+              ) : result.status === 'rejected_by_them' ? (
+                <div className="alert-box danger small">
+                  This user declined your previous request. You cannot message them unless they send a request to you.
+                </div>
+              ) : (
+                <div className="send-request-form">
+                  <input
+                    className="input input-sm"
+                    placeholder="Add an optional note (e.g. Hi, let’s build together!)"
+                    maxLength={300}
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                  />
+                  <button className="btn btn-primary btn-sm full mt-2" onClick={sendRequest} disabled={sending}>
+                    {sending ? <Spinner size={14} /> : <Send size={14} />} Send Message Request
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {users && users.length > 0 && (
+        <div className="connected-contacts mt-4">
+          <h4 className="small muted-label mb-2">Connected teammates</h4>
+          <div className="people-list">
+            {users.map((u) => (
+              <button key={u.id} className="person-row" onClick={() => onPick(u.id)}>
+                <Avatar user={u} size={36} presence />
+                <span className="grow">
+                  <strong>{u.name}</strong>
+                  <span className="muted small">{u.title || u.email}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -8,6 +8,32 @@ import { emitToConversation, emitToUser, joinConversation } from './realtime.js'
 export const membership = (conversationId, userId) =>
   get('SELECT * FROM conversation_members WHERE conversation_id = ? AND user_id = ?', conversationId, userId);
 
+export async function canMessageDirectly(userIdA, userIdB) {
+  if (userIdA === userIdB) return true;
+  const row = await get(
+    `SELECT 1 FROM message_requests
+     WHERE status = 'accepted'
+       AND ((sender_id = ? AND recipient_id = ?) OR (sender_id = ? AND recipient_id = ?))`,
+    userIdA,
+    userIdB,
+    userIdB,
+    userIdA,
+  );
+  return Boolean(row);
+}
+
+export async function getDirectRequest(userIdA, userIdB) {
+  return get(
+    `SELECT * FROM message_requests
+     WHERE (sender_id = ? AND recipient_id = ?) OR (sender_id = ? AND recipient_id = ?)
+     ORDER BY id DESC LIMIT 1`,
+    userIdA,
+    userIdB,
+    userIdB,
+    userIdA,
+  );
+}
+
 /** Load a conversation the current user belongs to. Non-members get a 404. */
 export async function requireConversation(req, id, { manage = false } = {}) {
   const cid = Number(id);

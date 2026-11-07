@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { AtSign, BellOff, MessageSquarePlus, Pin, Search } from 'lucide-react';
+import { AtSign, BellOff, MessageSquarePlus, Pin, Search, UserCheck } from 'lucide-react';
 import { conversationTitle, cx, listTime } from '../lib/format';
-import { useConversations, useMe, useTyping } from '../lib/store';
+import { useConversations, useMe, useRequests, useTyping } from '../lib/store';
 import type { Conversation, User } from '../lib/types';
 import { ChatView, NoChatSelected } from '../components/ChatView';
 import { NewChat } from '../components/ConversationInfo';
+import { RequestsModal } from '../components/RequestsModal';
 import { ConvAvatar, Empty, Loader } from '../components/ui';
 
 type Filter = 'all' | 'unread' | 'groups' | 'direct';
@@ -14,10 +15,14 @@ export function ChatsPage() {
   const id = Number(useParams().id) || null;
   const { data: me } = useMe();
   const { data: conversations, isLoading } = useConversations();
+  const { data: requestsData } = useRequests();
   const [filter, setFilter] = useState<Filter>('all');
   const [q, setQ] = useState('');
   const [creating, setCreating] = useState(false);
+  const [viewingRequests, setViewingRequests] = useState(false);
   const active = conversations?.find((c) => c.id === id);
+
+  const pendingRequests = (requestsData?.incoming ?? []).filter((r) => r.status === 'pending');
 
   const list = (conversations ?? []).filter((c) => {
     if (filter === 'unread' && !c.unread_count) return false;
@@ -31,10 +36,32 @@ export function ChatsPage() {
       <aside className="conv-pane">
         <header className="pane-head">
           <h1>Chats</h1>
-          <button className="icon-btn accent" onClick={() => setCreating(true)} aria-label="New conversation" title="New conversation">
-            <MessageSquarePlus size={21} />
-          </button>
+          <div className="pane-actions">
+            <button
+              className={cx('icon-btn', pendingRequests.length > 0 && 'has-badge')}
+              onClick={() => setViewingRequests(true)}
+              aria-label="Message requests"
+              title="Message requests"
+            >
+              <UserCheck size={20} />
+              {pendingRequests.length > 0 && <span className="action-badge">{pendingRequests.length}</span>}
+            </button>
+            <button className="icon-btn accent" onClick={() => setCreating(true)} aria-label="New conversation" title="New conversation">
+              <MessageSquarePlus size={21} />
+            </button>
+          </div>
         </header>
+
+        {pendingRequests.length > 0 && (
+          <div className="requests-banner" onClick={() => setViewingRequests(true)}>
+            <div className="requests-banner-content">
+              <strong>{pendingRequests.length} new message request{pendingRequests.length > 1 ? 's' : ''}</strong>
+              <span className="small muted">Review and accept to start chatting</span>
+            </div>
+            <button className="btn btn-sm btn-primary">Review</button>
+          </div>
+        )}
+
         <div className="search-box">
           <Search size={16} />
           <input placeholder="Search chats" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -53,13 +80,14 @@ export function ChatsPage() {
             list.map((c) => <ConversationRow key={c.id} c={c} me={me} active={c.id === id} />)
           ) : (
             <Empty title={filter === 'unread' ? 'All caught up ✨' : 'No conversations'}>
-              {filter === 'all' && !q ? 'Start a direct message or create a group for your team.' : null}
+              {filter === 'all' && !q ? 'Connect with teammates via email to start a direct message.' : null}
             </Empty>
           )}
         </div>
       </aside>
       <section className="chat-pane">{active ? <ChatView conversation={active} /> : id && isLoading ? <Loader /> : <NoChatSelected />}</section>
       {me && <NewChat open={creating} onClose={() => setCreating(false)} me={me} />}
+      <RequestsModal open={viewingRequests} onClose={() => setViewingRequests(false)} />
     </div>
   );
 }

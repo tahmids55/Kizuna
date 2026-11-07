@@ -339,11 +339,24 @@ CREATE TABLE IF NOT EXISTS poll_votes (
   user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   PRIMARY KEY (option_id, user_id)
 );
+
+CREATE TABLE IF NOT EXISTS message_requests (
+  id           SERIAL PRIMARY KEY,
+  sender_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status       TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected')),
+  note         TEXT NOT NULL DEFAULT '',
+  created_at   TEXT NOT NULL DEFAULT ${NOW},
+  updated_at   TEXT NOT NULL DEFAULT ${NOW},
+  UNIQUE (sender_id, recipient_id)
+);
+CREATE INDEX IF NOT EXISTS idx_requests_recipient ON message_requests(recipient_id, status);
+CREATE INDEX IF NOT EXISTS idx_requests_sender ON message_requests(sender_id, status);
 `;
 
 /** Every table, children first — used by `seed --reset`. */
 export const TABLES = [
-  'poll_votes', 'poll_options', 'polls', 'decision_acks', 'decisions', 'goal_updates', 'goals', 'idea_votes', 'ideas', 'tasks',
+  'message_requests', 'poll_votes', 'poll_options', 'polls', 'decision_acks', 'decisions', 'goal_updates', 'goals', 'idea_votes', 'ideas', 'tasks',
   'reminders', 'saved_messages', 'file_blobs', 'attachments', 'reactions', 'mentions', 'messages', 'conversation_members',
   'conversations', 'sessions', 'users',
 ];
@@ -357,6 +370,16 @@ export function initDb() {
     await driver.transaction(async (c) => {
       await c.query('SELECT pg_advisory_xact_lock(7461001)');
       for (const stmt of SCHEMA.split(';').map((s) => s.trim()).filter(Boolean)) await c.query(stmt);
+      // Auto-populate accepted requests for existing direct conversation pairs
+      await c.query(`
+        INSERT INTO message_requests (sender_id, recipient_id, status, created_at, updated_at)
+        SELECT m1.user_id, m2.user_id, 'accepted', c.created_at, c.created_at
+        FROM conversations c
+        JOIN conversation_members m1 ON m1.conversation_id = c.id
+        JOIN conversation_members m2 ON m2.conversation_id = c.id AND m2.user_id != m1.user_id
+        WHERE c.type = 'direct'
+        ON CONFLICT (sender_id, recipient_id) DO NOTHING
+      `);
     });
   })();
   return ready;

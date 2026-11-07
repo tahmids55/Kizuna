@@ -87,13 +87,39 @@ test('accounts: register, login, token auth, personal space', async () => {
   assert.equal(convs[0].type, 'self', 'every user gets a private space');
 });
 
-test('direct messages are unique per pair', async () => {
-  const r1 = await ana.call('POST', '/conversations/direct', { user_id: ben.user.id });
-  assert.equal(r1.status, 201);
+test('message request flow and direct messages unique per pair', async () => {
+  // Outsider cannot send message or direct chat without request
+  const unauthDm = await ana.call('POST', '/conversations/direct', { user_id: ben.user.id });
+  assert.equal(unauthDm.status, 403, 'direct chat forbidden without accepted request');
+
+  // Lookup requires complete email
+  const lookupNotFound = await ana.call('GET', `/requests/lookup?email=wrong@kizuna.test`);
+  assert.equal(lookupNotFound.body.status, 'not_found');
+
+  const lookupFound = await ana.call('GET', `/requests/lookup?email=${encodeURIComponent(ben.user.email)}`);
+  assert.equal(lookupFound.body.status, 'none');
+  assert.equal(lookupFound.body.user.id, ben.user.id);
+
+  // Send request with email
+  const req = await ana.call('POST', '/requests', { email: ben.user.email, note: 'Hey Ben, let’s chat!' });
+  assert.equal(req.status, 201);
+  assert.equal(req.body.request.status, 'pending');
+
+  // Ben sees incoming request
+  const reqs = (await ben.call('GET', '/requests')).body;
+  assert.equal(reqs.incoming.length, 1);
+  assert.equal(reqs.incoming[0].note, 'Hey Ben, let’s chat!');
+
+  // Ben accepts
+  const accepted = await ben.call('POST', `/requests/${req.body.request.id}/accept`);
+  assert.equal(accepted.status, 200);
+  assert.equal(accepted.body.request.status, 'accepted');
+  dm = accepted.body.conversation;
+
+  // Direct messages now open and unique per pair
   const r2 = await ben.call('POST', '/conversations/direct', { user_id: ana.user.id });
   assert.equal(r2.status, 200);
-  assert.equal(r1.body.conversation.id, r2.body.conversation.id);
-  dm = r1.body.conversation;
+  assert.equal(dm.id, r2.body.conversation.id);
   assert.equal((await cara.call('GET', `/conversations/${dm.id}/messages`)).status, 404, 'outsiders cannot read');
 });
 
@@ -265,4 +291,34 @@ test('leaving a group removes access', async () => {
   assert.equal((await cara.call('DELETE', `/conversations/${group.id}/members/${cara.user.id}`)).status, 200);
   assert.equal((await removed).id, group.id);
   assert.equal((await cara.call('GET', `/conversations/${group.id}/messages`)).status, 404);
+});
+
+test('declining a request blocks messaging until recipient changes decision', async () => {
+  // Cara requests Ben via email
+  const req = await cara.call('POST', '/requests', { email: ben.user.email, note: 'Can we chat?' });
+  assert.equal(req.status, 201);
+  assert.equal(req.body.request.status, 'pending');
+
+  // Ben declines the request
+  const rejected = await ben.call('POST', `/requests/${req.body.request.id}/reject`);
+  assert.equal(rejected.status, 200);
+  assert.equal(rejected.body.request.status, 'rejected');
+
+  // Cara cannot message or re-request while rejected
+  const reReq = await cara.call('POST', '/requests', { email: ben.user.email });
+  assert.equal(reReq.status, 403);
+  assert.match(reReq.body.error, /declined your message request/i);
+
+  // Now Ben changes decision and initiates request to Cara
+  const benReq = await ben.call('POST', '/requests', { email: cara.user.email, note: 'Changed my mind!' });
+  assert.equal(benReq.status, 201);
+
+  // Cara accepts
+  const accepted = await cara.call('POST', `/requests/${benReq.body.request.id}/accept`);
+  assert.equal(accepted.status, 200);
+  assert.equal(accepted.body.request.status, 'accepted');
+
+  // Now Cara and Ben can exchange direct messages
+  const msg = await cara.call('POST', `/conversations/${accepted.body.conversation.id}/messages`, { body: 'Glad to connect!' });
+  assert.equal(msg.status, 201);
 });

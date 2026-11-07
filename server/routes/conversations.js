@@ -5,6 +5,7 @@ import { MAX_GROUP_MEMBERS, badRequest, field, forbidden, notFound, pickColor } 
 import {
   addMembers,
   broadcastConversation,
+  canMessageDirectly,
   conversationFor,
   displayName,
   listConversations,
@@ -20,7 +21,27 @@ export const conversationsRouter = Router();
 /* ------------------------------------------------------------------ people */
 
 conversationsRouter.get('/users', async (req, res) => {
-  const users = await all('SELECT * FROM users ORDER BY lower(name)');
+  const users = await all(
+    `SELECT DISTINCT u.* FROM users u
+     WHERE u.id != ?
+       AND (
+         u.id IN (
+           SELECT recipient_id FROM message_requests WHERE sender_id = ? AND status = 'accepted'
+           UNION
+           SELECT sender_id FROM message_requests WHERE recipient_id = ? AND status = 'accepted'
+         )
+         OR u.id IN (
+           SELECT cm2.user_id FROM conversation_members cm1
+           JOIN conversation_members cm2 ON cm2.conversation_id = cm1.conversation_id
+           WHERE cm1.user_id = ?
+         )
+       )
+     ORDER BY lower(u.name)`,
+    req.user.id,
+    req.user.id,
+    req.user.id,
+    req.user.id,
+  );
   res.json({ users: users.map((u) => ({ ...publicUser(u), online: isOnline(u.id) })) });
 });
 
@@ -46,6 +67,8 @@ conversationsRouter.post('/conversations/direct', async (req, res) => {
   const otherId = field.id(req.body, 'user_id', { label: 'Person', nullable: false });
   if (otherId === req.user.id) throw badRequest('Use “My space” for notes to yourself');
   if (!(await get('SELECT 1 FROM users WHERE id = ?', otherId))) throw notFound('Person not found');
+  const allowed = await canMessageDirectly(req.user.id, otherId);
+  if (!allowed) throw forbidden('You can only start a direct chat after a message request is accepted.');
   const key = [req.user.id, otherId].sort((a, b) => a - b).join(':');
   let cid = (await get('SELECT id FROM conversations WHERE direct_key = ?', key))?.id;
   let created = false;

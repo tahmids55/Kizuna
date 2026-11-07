@@ -10,6 +10,7 @@ import { attachUser, authRouter, requireUser } from './auth.js';
 import { initRealtime } from './realtime.js';
 import { conversationsRouter } from './routes/conversations.js';
 import { filesRouter, messagesRouter, scheduleReminders, stopReminders } from './routes/messages.js';
+import { requestsRouter } from './routes/requests.js';
 import { workRouter } from './routes/work.js';
 
 export function createApp() {
@@ -45,7 +46,7 @@ export function createApp() {
   });
   api.use(attachUser);
   api.use(authRouter);
-  api.use(requireUser, conversationsRouter, messagesRouter, workRouter);
+  api.use(requireUser, conversationsRouter, messagesRouter, workRouter, requestsRouter);
   api.use((_req, res) => res.status(404).json({ error: 'Not found' }));
   app.use('/api', api);
 
