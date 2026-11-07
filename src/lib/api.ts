@@ -8,10 +8,18 @@ const TOKEN_KEY = 'kizuna-token';
 
 const FALLBACK_SERVER = 'https://kizuna-rb1z.onrender.com';
 
-export const defaultServer = () =>
-  localStorage.getItem(SERVER_KEY) ||
-  (import.meta.env.VITE_DEFAULT_SERVER as string | undefined) ||
-  FALLBACK_SERVER;
+export const defaultServer = () => {
+  const stored = localStorage.getItem(SERVER_KEY);
+  if (stored && /(?:192\.168\.|10\.\d+\.|172\.(?:1[6-9]|2\d|3[01])\.|localhost|127\.0\.0\.1)/.test(stored)) {
+    localStorage.removeItem(SERVER_KEY);
+    return (import.meta.env.VITE_DEFAULT_SERVER as string | undefined) || FALLBACK_SERVER;
+  }
+  return (
+    stored ||
+    (import.meta.env.VITE_DEFAULT_SERVER as string | undefined) ||
+    FALLBACK_SERVER
+  );
+};
 
 /** On web the API is same-origin; on native it defaults to the configured backend without manual user input. */
 export const serverUrl = () => {

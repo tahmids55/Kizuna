@@ -26,7 +26,10 @@ function Session() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me?.id]);
   if (isLoading) return <Loader />;
-  if (error && !me) return <Navigate to="/login" replace />;
+  if (error && !me) {
+    setToken(null);
+    return <Navigate to="/login" replace />;
+  }
   return <Outlet />;
 }
 

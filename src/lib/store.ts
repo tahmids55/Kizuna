@@ -51,7 +51,13 @@ export const activeConversation = createStore<number | null>(null);
 
 /* ----------------------------------------------------------------- queries */
 
-export const useMe = () => useQuery({ queryKey: ['me'], queryFn: () => api<{ user: User }>('/auth/me').then((r) => r.user), staleTime: Infinity });
+export const useMe = () =>
+  useQuery({
+    queryKey: ['me'],
+    queryFn: () => api<{ user: User }>('/auth/me').then((r) => r.user),
+    staleTime: Infinity,
+    retry: false,
+  });
 export const useUsers = () => useQuery({ queryKey: ['users'], queryFn: () => api<{ users: User[] }>('/users').then((r) => r.users) });
 export const useConversations = () =>
   useQuery({ queryKey: ['conversations'], queryFn: () => api<{ conversations: Conversation[] }>('/conversations').then((r) => r.conversations) });
