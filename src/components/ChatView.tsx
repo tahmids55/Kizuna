@@ -1,16 +1,17 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowDown, ArrowLeft, BellOff, Info, LayoutPanelLeft, Pin, Upload, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, BellOff, Info, LayoutPanelLeft, Phone, Pin, Upload, Video, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { conversationTitle, cx, dayLabel, firstName, lastSeen, otherMember, plural } from '../lib/format';
-import { activeConversation, loadOlder, markReadLocally, useHub, useMe, useMessages, useOnline, useTyping, usePresence } from '../lib/store';
-import type { Conversation, Message, User } from '../lib/types';
+import { activeCallStore, activeConversation, loadOlder, markReadLocally, useHub, useMe, useMessages, useOnline, useTyping, usePresence } from '../lib/store';
+import type { ActiveCall, Conversation, Message, User } from '../lib/types';
 import { Composer, type ComposerHandle } from './Composer';
 import { MessageItem } from './Message';
 import { HubPanel, type HubTab } from './HubPanel';
 import { ConversationInfo } from './ConversationInfo';
 import { ConvAvatar, Empty, Loader, Modal, Spinner } from './ui';
 import { useWork } from './WorkForms';
+import { toastError } from './Toast';
 
 const GROUP_GAP = 5 * 60e3;
 
@@ -225,6 +226,22 @@ function Chat({ conversation, me }: { conversation: Conversation; me: User }) {
     );
   });
 
+  const startCall = async (isVideo: boolean) => {
+    try {
+      const res = await api<ActiveCall>(`/conversations/${cid}/call/token`, {
+        method: 'POST',
+        body: { isVideo },
+      });
+      activeCallStore.set({
+        ...res,
+        conversationId: cid,
+        isVideo,
+      });
+    } catch (err) {
+      toastError(err);
+    }
+  };
+
   return (
     <div className={cx('chat-layout', panel && 'with-panel')}>
       <section
@@ -248,6 +265,16 @@ function Chat({ conversation, me }: { conversation: Conversation; me: User }) {
             </span>
           </button>
           <span className="spacer" />
+          {conversation.type !== 'self' && (
+            <>
+              <button className="icon-btn" onClick={() => startCall(false)} aria-label="Voice Call" title="Start voice call">
+                <Phone size={19} />
+              </button>
+              <button className="icon-btn" onClick={() => startCall(true)} aria-label="Video Call" title="Start video call">
+                <Video size={19} />
+              </button>
+            </>
+          )}
           <button className={cx('icon-btn panel-btn', panel && 'on')} onClick={() => setPanel(panel ? null : 'tasks')} aria-label="Tasks, ideas & goals" title="Tasks, ideas & goals">
             <LayoutPanelLeft size={20} />
             {openTasks > 0 && <span className="badge-dot">{openTasks}</span>}

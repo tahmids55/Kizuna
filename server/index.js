@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { DB_LABEL, ROOT, closeDb, initDb } from './db.js';
 import { attachUser, authRouter, requireUser } from './auth.js';
 import { initRealtime } from './realtime.js';
+import { callsRouter } from './routes/calls.js';
 import { conversationsRouter } from './routes/conversations.js';
 import { filesRouter, messagesRouter, scheduleReminders, stopReminders } from './routes/messages.js';
 import { requestsRouter } from './routes/requests.js';
@@ -46,7 +47,7 @@ export function createApp() {
   });
   api.use(attachUser);
   api.use(authRouter);
-  api.use(requireUser, conversationsRouter, messagesRouter, workRouter, requestsRouter);
+  api.use(requireUser, conversationsRouter, messagesRouter, workRouter, requestsRouter, callsRouter);
   api.use((_req, res) => res.status(404).json({ error: 'Not found' }));
   app.use('/api', api);
 

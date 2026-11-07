@@ -6,6 +6,11 @@ process.env.KIZUNA_SKIP_DOTENV = '1';
 delete process.env.DATABASE_URL;
 if (process.env.TEST_DATABASE_URL) process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 else process.env.KIZUNA_PGLITE = 'memory';
+
+process.env.LIVEKIT_URL ??= 'wss://kizuna-test.livekit.cloud';
+process.env.LIVEKIT_API_KEY ??= 'API_TEST_KEY';
+process.env.LIVEKIT_API_SECRET ??= 'SECRET_TEST_KEY_LONG_ENOUGH_FOR_HMAC_SHA256';
+
 const { createServer } = await import('../index.js');
 const { closeDb } = await import('../db.js');
 const { io: connect } = await import('socket.io-client');
@@ -321,4 +326,28 @@ test('declining a request blocks messaging until recipient changes decision', as
   // Now Cara and Ben can exchange direct messages
   const msg = await cara.call('POST', `/conversations/${accepted.body.conversation.id}/messages`, { body: 'Glad to connect!' });
   assert.equal(msg.status, 201);
+});
+
+test('audio and video calling: token generation, incoming call signaling and leave', async () => {
+  const sBen = await ben.socket();
+  const incoming = waitFor(sBen, 'call:incoming', (p) => p.conversationId === group.id);
+
+  // Ana starts a video call in the Founders group
+  const tokenRes = await ana.call('POST', `/conversations/${group.id}/call/token`, { isVideo: true });
+  assert.equal(tokenRes.status, 200);
+  assert.ok(tokenRes.body.token, 'returns JWT token');
+  assert.ok(tokenRes.body.serverUrl, 'returns LiveKit server URL');
+  assert.equal(tokenRes.body.roomName, `kizuna_room_${group.id}`);
+
+  // Ben receives real-time incoming call alert
+  const received = await incoming;
+  assert.equal(received.caller.name, ana.user.name);
+  assert.equal(received.isVideo, true);
+
+  // Outsider cannot join the call
+  assert.equal((await cara.call('POST', `/conversations/${group.id}/call/token`)).status, 404);
+
+  // Leave call
+  const leaveRes = await ana.call('POST', `/conversations/${group.id}/call/leave`);
+  assert.equal(leaveRes.status, 200);
 });

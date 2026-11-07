@@ -6,6 +6,8 @@ import { useConnection, useConversations, useMe, useToday } from '../lib/store';
 import { Avatar, Logo } from './ui';
 import { SearchModal } from './Search';
 import { WorkProvider } from './WorkForms';
+import { CallModal } from './CallModal';
+import { IncomingCallBanner } from './IncomingCallBanner';
 
 export function Layout() {
   const { data: me } = useMe();
@@ -94,6 +96,8 @@ export function Layout() {
             <span>Me</span>
           </NavLink>
         </nav>
+        <IncomingCallBanner />
+        <CallModal />
         <SearchModal open={search} onClose={() => setSearch(false)} />
       </div>
     </WorkProvider>

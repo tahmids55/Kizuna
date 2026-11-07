@@ -23,6 +23,26 @@ export interface MessageRequest {
   recipient: User | null;
 }
 
+export interface ActiveCall {
+  conversationId: number;
+  token: string;
+  serverUrl: string;
+  roomName: string;
+  isVideo: boolean;
+  minimized?: boolean;
+}
+
+export interface IncomingCall {
+  conversationId: number;
+  conversationTitle: string;
+  caller: {
+    id: number;
+    name: string;
+    avatar: string | null;
+  };
+  isVideo: boolean;
+}
+
 export interface Member extends User {
   role: 'owner' | 'admin' | 'member';
   last_read_id: number;

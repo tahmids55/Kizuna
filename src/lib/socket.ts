@@ -2,11 +2,13 @@ import { io, type Socket } from 'socket.io-client';
 import { getToken, serverUrl } from './api';
 import { isAppActive, notify } from './platform';
 import {
+  activeCallStore,
   activeConversation,
   applyItem,
   applyMessage,
   applyUser,
   connectionStore,
+  incomingCallStore,
   markReadLocally,
   presenceStore,
   queryClient,
@@ -17,7 +19,7 @@ import {
 } from './store';
 import { conversationTitle } from './format';
 import { toast } from '../components/Toast';
-import type { Conversation, ItemType, Message, MessageRequest, User } from './types';
+import type { Conversation, IncomingCall, ItemType, Message, MessageRequest, User } from './types';
 
 let socket: Socket | null = null;
 
@@ -97,6 +99,20 @@ export function connectRealtime(me: User) {
     queryClient.invalidateQueries({ queryKey: ['requests'] });
     queryClient.invalidateQueries({ queryKey: ['conversations'] });
     queryClient.invalidateQueries({ queryKey: ['users'] });
+  });
+
+  s.on('call:incoming', (payload: IncomingCall) => {
+    const current = activeCallStore.get();
+    if (current?.conversationId === payload.conversationId) return;
+    incomingCallStore.set(payload);
+    toast(`Incoming ${payload.isVideo ? 'video' : 'audio'} call from ${payload.caller.name}`);
+  });
+
+  s.on('call:ended', ({ conversationId }: { conversationId: number }) => {
+    const incoming = incomingCallStore.get();
+    if (incoming?.conversationId === conversationId) {
+      incomingCallStore.set(null);
+    }
   });
 }
 

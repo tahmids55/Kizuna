@@ -1,7 +1,7 @@
 import { QueryClient, useQuery } from '@tanstack/react-query';
 import { useSyncExternalStore } from 'react';
 import { ApiError, api } from './api';
-import type { Conversation, Decision, Goal, Hub, Idea, ItemType, Message, MessageRequest, Poll, Reminder, Task, Today, User } from './types';
+import type { ActiveCall, Conversation, Decision, Goal, Hub, Idea, IncomingCall, ItemType, Message, MessageRequest, Poll, Reminder, Task, Today, User } from './types';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -45,6 +45,12 @@ export const useTyping = (cid: number) => {
 
 export const connectionStore = createStore<'connecting' | 'online' | 'offline'>('connecting');
 export const useConnection = () => useSyncExternalStore(connectionStore.subscribe, connectionStore.get);
+
+export const activeCallStore = createStore<ActiveCall | null>(null);
+export const useActiveCall = () => useSyncExternalStore(activeCallStore.subscribe, activeCallStore.get);
+
+export const incomingCallStore = createStore<IncomingCall | null>(null);
+export const useIncomingCall = () => useSyncExternalStore(incomingCallStore.subscribe, incomingCallStore.get);
 
 /** The conversation currently on screen (used to decide unread counts & notifications). */
 export const activeConversation = createStore<number | null>(null);
