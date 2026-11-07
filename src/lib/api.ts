@@ -38,7 +38,8 @@ export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const setToken = (t: string | null) => (t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY));
 
 /** Absolute URL for server-relative paths like /api/files/… (needed inside the Android app). */
-export const fileUrl = (path: string | null | undefined) => (path ? `${serverUrl()}${path}` : '');
+export const fileUrl = (path: string | null | undefined) =>
+  path ? (/^https?:\/\//i.test(path) ? path : `${serverUrl()}${path}`) : '';
 
 export class ApiError extends Error {
   status: number;

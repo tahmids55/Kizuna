@@ -207,6 +207,7 @@ CREATE TABLE IF NOT EXISTS attachments (
   filename        TEXT NOT NULL,
   mime            TEXT NOT NULL,
   size            INTEGER NOT NULL,
+  remote_url      TEXT,
   created_at      TEXT NOT NULL DEFAULT ${NOW}
 );
 CREATE INDEX IF NOT EXISTS idx_attachments_msg ON attachments(message_id);
@@ -370,6 +371,7 @@ export function initDb() {
     await driver.transaction(async (c) => {
       await c.query('SELECT pg_advisory_xact_lock(7461001)');
       for (const stmt of SCHEMA.split(';').map((s) => s.trim()).filter(Boolean)) await c.query(stmt);
+      await c.query('ALTER TABLE attachments ADD COLUMN IF NOT EXISTS remote_url TEXT').catch(() => {});
       for (const table of TABLES) await c.query(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`).catch(() => {});
       // Auto-populate accepted requests for existing direct conversation pairs
       await c.query(`

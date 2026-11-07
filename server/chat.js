@@ -151,7 +151,7 @@ export async function addMembers(cid, userIds, role = 'member') {
 
 /* --------------------------------------------------------------- messages */
 
-const fileUrl = (a) => `/api/files/${a.file_key}/${encodeURIComponent(a.filename)}`;
+const fileUrl = (a) => a.remote_url || `/api/files/${a.file_key}/${encodeURIComponent(a.filename)}`;
 
 export const serializeAttachment = (a) => ({ id: a.id, filename: a.filename, mime: a.mime, size: a.size, url: fileUrl(a) });
 

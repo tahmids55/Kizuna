@@ -179,7 +179,7 @@ export async function updateProfile(req) {
   const statusText = field.text(b, 'status_text', { label: 'Status', max: 100 });
   if (statusText !== undefined) sets.status_text = statusText;
   if ('avatar' in b) {
-    if (b.avatar !== null && (typeof b.avatar !== 'string' || !/^\/api\/files\/[A-Za-z0-9_-]+\/[^/]+$/.test(b.avatar))) {
+    if (b.avatar !== null && (typeof b.avatar !== 'string' || (!/^\/api\/files\/[A-Za-z0-9_-]+\/[^/]+$/.test(b.avatar) && !/^https:\/\/(?:res\.cloudinary\.com|[a-z0-9.-]+\.cloudinary\.com)\//.test(b.avatar)))) {
       throw badRequest('Invalid avatar');
     }
     sets.avatar = b.avatar;

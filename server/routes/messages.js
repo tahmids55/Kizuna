@@ -3,6 +3,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { all, get, insert, run, tx } from '../db.js';
 import { badRequest, field, forbidden, notFound, now } from '../util.js';
+import { isCloudinaryConfigured, uploadToCloudinary } from '../cloudinary.js';
 import {
   broadcastMessage,
   canMessageDirectly,
@@ -305,22 +306,41 @@ export async function deliverDueReminders() {
 
 const INLINE_TYPES = /^(image\/(png|jpe?g|gif|webp|avif)|application\/pdf|video\/(mp4|webm)|audio\/(mpeg|ogg|webm|mp4|wav))$/;
 
-/** Save an uploaded file in the database (Render's free disk does not survive restarts). */
+/** Save an uploaded file to Cloudinary if configured, or in the database as fallback. */
 async function storeFile(file, uploaderId, conversationId) {
   const key = crypto.randomBytes(18).toString('base64url');
   const filename = (Buffer.from(file.originalname, 'latin1').toString('utf8') || 'file').replace(/[/\\\0]/g, '_').slice(0, 180);
   const mime = /^[\w.+-]+\/[\w.+-]+$/.test(file.mimetype) ? file.mimetype : 'application/octet-stream';
+
+  let remoteUrl = null;
+  if (isCloudinaryConfigured()) {
+    try {
+      const isImage = mime.startsWith('image/');
+      const result = await uploadToCloudinary(file.buffer, {
+        folder: conversationId ? `kizuna/chat_${conversationId}` : 'kizuna/avatars',
+        resourceType: isImage ? 'image' : 'auto',
+        filename,
+      });
+      remoteUrl = result.secure_url;
+    } catch (err) {
+      console.error('Cloudinary upload failed, falling back to database blob storage:', err.message);
+    }
+  }
+
   return tx(async () => {
     const id = await insert(
-      'INSERT INTO attachments (conversation_id, uploader_id, file_key, filename, mime, size) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO attachments (conversation_id, uploader_id, file_key, filename, mime, size, remote_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
       conversationId,
       uploaderId,
       key,
       filename,
       mime,
       file.size,
+      remoteUrl,
     );
-    await run('INSERT INTO file_blobs (file_key, data) VALUES (?, ?)', key, file.buffer);
+    if (!remoteUrl) {
+      await run('INSERT INTO file_blobs (file_key, data) VALUES (?, ?)', key, file.buffer);
+    }
     return get('SELECT * FROM attachments WHERE id = ?', id);
   });
 }
@@ -358,15 +378,17 @@ messagesRouter.post('/uploads/avatar', async (req, res) => {
  */
 filesRouter.get('/files/:key/:name', async (req, res) => {
   const a = await get(
-    'SELECT a.filename, a.mime, b.data FROM attachments a JOIN file_blobs b ON b.file_key = a.file_key WHERE a.file_key = ?',
+    'SELECT a.filename, a.mime, a.remote_url, b.data FROM attachments a LEFT JOIN file_blobs b ON b.file_key = a.file_key WHERE a.file_key = ?',
     req.params.key,
   );
   if (!a) throw notFound('File not found');
+  if (a.remote_url) return res.redirect(302, a.remote_url);
+  if (!a.data) throw notFound('File content not found');
   const inline = INLINE_TYPES.test(a.mime);
   res.set({
     'Content-Type': a.mime,
     'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(a.filename)}`,
-    'Content-Security-Policy': "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'",
+    'Content-Security-Policy': "default-src 'none'; img-src 'self' https://res.cloudinary.com; media-src 'self' https://res.cloudinary.com; style-src 'unsafe-inline'",
     'Cache-Control': 'private, max-age=31536000, immutable',
   });
   res.send(Buffer.from(a.data));
